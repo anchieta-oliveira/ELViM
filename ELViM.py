@@ -11,11 +11,12 @@ import numpy as np
 from numba import njit, prange
 import os
 import shutil
+import time
 import mdtraj as md
 import force_scheme as force
 import sys
 
-@njit(parallel=True, fastmath=False)         ####dissimilarity defautl, generalizar para diferentes sigma_0 e epsilon
+@njit(parallel=True, fastmath=False, cache=True)         ####dissimilarity defautl, generalizar para diferentes sigma_0 e epsilon
 def square_to_condensed(sqdmat):
    """
    Convert the symmetrical square matrix to the required condensed form.
@@ -24,20 +25,20 @@ def square_to_condensed(sqdmat):
    total = size*(size+1)//2
    d=np.zeros(total, dtype=np.float32) 
    for k in prange (size):
-      for l in prange (k, size):
+      for l in range (k, size):
          d[int(total - ((size - k) * (size - k + 1) / 2) + (l - k))] = sqdmat[k,l]
    return d 
 
 
-@njit(parallel=True, fastmath=False)         ####dissimilarity defautl, generalizar para diferentes sigma_0 e epsilon
+@njit(parallel=True, fastmath=False, cache=True)         ####dissimilarity defautl, generalizar para diferentes sigma_0 e epsilon
 def dissimilarity(coords, d, k, s0,size, atoms, total):
     epsilon=0.15
     sigma_0=s0
     for l in prange (k, size):
        N=0
        ep=0
-       for i in prange(atoms):
-          for j in prange (i+1,atoms):
+       for i in range(atoms):
+          for j in range (i+1,atoms):
              xijk = (coords[k][i][0] - coords[k][j][0])
              yijk = (coords[k][i][1] - coords[k][j][1])
              zijk = (coords[k][i][2] - coords[k][j][2])
@@ -53,6 +54,31 @@ def dissimilarity(coords, d, k, s0,size, atoms, total):
        d[int(total - ((size - k) * (size - k + 1) / 2) + (l - k))] = 1-ep/N
     pass   
        
+@njit(parallel=True, fastmath=False, cache=True)         ####dissimilarity defautl, generalizar para diferentes sigma_0 e epsilon
+def dissimilarity_no_verbose(coords, d, s0,size, atoms, total):
+    epsilon=0.15
+    sigma_0=s0
+    for k in prange (size):
+        for l in range (k, size):
+            N=0
+            ep=0
+            for i in range(atoms):
+                for j in range (i+1,atoms):
+                    xijk = (coords[k][i][0] - coords[k][j][0])
+                    yijk = (coords[k][i][1] - coords[k][j][1])
+                    zijk = (coords[k][i][2] - coords[k][j][2])
+                    rijk = np.sqrt(xijk*xijk + yijk*yijk + zijk*zijk)
+                    xijl = (coords[l][i][0] - coords[l][j][0])
+                    yijl = (coords[l][i][1] - coords[l][j][1])
+                    zijl = (coords[l][i][2] - coords[l][j][2])
+                    rijl = np.sqrt(xijl*xijl + yijl*yijl + zijl*zijl)
+                    dr = (rijk-rijl)**2
+                    sigma = sigma_0*abs(i-j)**epsilon 
+                    ep = ep + np.exp(-dr/(2*sigma**2))
+                    N = N + 1
+            d[int(total - ((size - k) * (size - k + 1) / 2) + (l - k))] = 1-ep/N
+    return d
+
 def calc_dmat(coords, s0, outdm, verbose):
     """
       Calculates the dissimilarity matrix using coordinates of C-alpha carbons.
@@ -83,9 +109,22 @@ def calc_dmat(coords, s0, outdm, verbose):
             dissimilarity(coords, dmat, k, s0, size, atoms, total)
         
     else:
+        start1 = time.perf_counter()
         for k in range (size):
             dissimilarity(coords, dmat, k, s0, size, atoms, total)
-   
+
+        end1 = time.perf_counter()
+        time1 = end1 - start1
+        start2 = time.perf_counter()
+        dmat_a = dissimilarity_no_verbose(coords, dmat, s0, size, atoms, total)
+        end2 = time.perf_counter()
+        time2 = end2 - start2
+
+        print(f"time dissimilarity: {time1:.6f} s")
+        print(f"time dissimilarity_no_verbose: {time2:.6f} s")
+        print(f"Error: {np.mean(dmat - dmat_a)}")
+
+
     if outdm!=None:
         if os.path.exists(outdm):
             backup_file(outdm)
