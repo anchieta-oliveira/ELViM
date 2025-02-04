@@ -117,16 +117,7 @@ def execute(distance_matrix, projection, max_it, verbose, learning_rate0=0.5, lr
     else:
         for k in range(max_it):
             learning_rate = max(learning_rate0 * math.pow((1 - k / max_it), decay), lrmin)
-            start1 = time.perf_counter()
-            new_error = iteration(index, distance_matrix, projection, learning_rate)
-            end1 = time.perf_counter()
-            time1 = end1 - start1
-            print(f"time iteration_ori: {time1:.6f} s")
-            start1 = time.perf_counter()
             new_error = iteration_no_verbose(index, distance_matrix, projection, learning_rate)
-            end1 = time.perf_counter()
-            time1 = end1 - start1
-            print(f"time iteration_no_verbose: {time1:.6f} s")
             if math.fabs(new_error - error) < tolerance:
                 break
             error = new_error
