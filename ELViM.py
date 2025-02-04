@@ -109,21 +109,7 @@ def calc_dmat(coords, s0, outdm, verbose):
             dissimilarity(coords, dmat, k, s0, size, atoms, total)
         
     else:
-        start1 = time.perf_counter()
-        for k in range (size):
-            dissimilarity(coords, dmat, k, s0, size, atoms, total)
-
-        end1 = time.perf_counter()
-        time1 = end1 - start1
-        start2 = time.perf_counter()
-        dmat_a = dissimilarity_no_verbose(coords, dmat, s0, size, atoms, total)
-        end2 = time.perf_counter()
-        time2 = end2 - start2
-
-        print(f"time dissimilarity: {time1:.6f} s")
-        print(f"time dissimilarity_no_verbose: {time2:.6f} s")
-        print(f"Error: {np.mean(dmat - dmat_a)}")
-
+        dmat = dissimilarity_no_verbose(coords, dmat, s0, size, atoms, total)
 
     if outdm!=None:
         if os.path.exists(outdm):
